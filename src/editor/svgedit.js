@@ -1643,6 +1643,68 @@ editor.init = () => {
     }
   };
 
+  const clickBuildLSystemResult = editor.clickBuildLSystemResult = async function () {
+    const currentDrawing = svgCanvas.getCurrentDrawing();
+    console.log(currentDrawing.layer_map);
+    // copy axiom
+    svgCanvas.setCurrentLayer('axiom');
+    svgCanvas.selectAllInCurrentLayer();
+    copySelected();
+
+    // prepare new layer, for result
+    let uniqName,
+      i = currentDrawing.getNumLayers();
+    do {
+      uniqName = uiStrings.layers.layer + ' ' + (++i);
+    } while (currentDrawing.hasLayer(uniqName));
+
+    const newName = await $.prompt('L-system result layer name:', uniqName);
+    if (!newName) { return; }
+    if (currentDrawing.hasLayer(newName)) {
+      /* await */ $.alert(uiStrings.notification.dupeLayerName);
+      return;
+    }
+    svgCanvas.createLayer(newName);
+    updateContextPanel();
+    populateLayers();
+
+    // after new layer created, its selected now, and we dont need to select it manually
+    // paste axiom to the new layer
+    const zoom = svgCanvas.getZoom();
+    const x = (workarea[0].scrollLeft + workarea.width() / 2) / zoom - svgCanvas.contentW;
+    const y = (workarea[0].scrollTop + workarea.height() / 2) / zoom - svgCanvas.contentH;
+    svgCanvas.pasteElements('point', x, y);
+
+    // search all rules we have
+    const rulesElems = currentDrawing.getLayerByName('rules').children;
+    const resultLayer = currentDrawing.getCurrentLayer();
+
+    // generating L-system result according to N number of generation
+    for (let i = 0; i < 1; ++i) {
+      const axiomLayer = currentDrawing.getLayerByName('axiom');
+      for (let j = 0; j < axiomLayer.children.length; ++j) {
+        const axiomElem = axiomLayer.children[j];
+        if (axiomElem.getBBox) {
+          // const elemBBox = axiomElem.getBBox();
+          // const elemWidth = elemBBox.width, elemHeight = elemBBox.height;
+
+          for (const ruleElem of rulesElems) {
+            const ruleClass = ruleElem.getAttribute('class');
+            const axiomElemClass = `for${axiomElem.getAttribute('class')}`;
+            if (ruleElem.getBBox && ruleClass === axiomElemClass) {
+              resultLayer.append(currentDrawing.copyElem(ruleElem));
+              // TODO: resize appended elem to the current axiom element size
+              // TODO: translate appended elem to the current axiom element position
+              // TODO: remove current axiom element
+              // TODO: ungroup rule element?
+              break;
+            }
+          }
+        }
+      }
+    }
+  };
+
   /**
   * Set a selected image's URL.
   * @function module:SVGEditor.setImageURL
@@ -4065,11 +4127,11 @@ editor.init = () => {
   *
   * @returns {void}
   */
-  const copySelected = function () {
+  function copySelected () {
     if (!Utils.isNullish(selectedElement) || multiselected) {
       svgCanvas.copySelectedElements();
     }
-  };
+  }
 
   /**
   *
@@ -5401,6 +5463,7 @@ editor.init = () => {
      */
     const toolButtons = [
       {sel: '#tool_select', fn: clickSelect, evt: 'click', key: ['V', true]},
+      {sel: '#tool_build_lsystem_result', fn: clickBuildLSystemResult, evt: 'click'},
       {sel: '#tool_fhpath', fn: clickFHPath, evt: 'click', key: ['Q', true]},
       {sel: '#tool_line', fn: clickLine, evt: 'click', key: ['L', true], parent: '#tools_line', prepend: true},
       {sel: '#tool_rect', fn: clickRect, evt: 'mouseup', key: ['R', true], parent: '#tools_rect', icon: 'rect'},
